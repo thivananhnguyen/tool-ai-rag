@@ -28,7 +28,7 @@ async function callMistral(messages, tools) {
 export async function runAgent(tools, toolFunctions, messages) {
   let iterations = 0;
 
-  while (iterations < 10) {
+  while (iterations < 20) {
     iterations++;
     const callStart = Date.now();
     const data = await callMistral(messages, tools);

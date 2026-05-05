@@ -12,7 +12,13 @@ const toolFunctions = { web_search, get_weather, calculate };
 const answer = await runAgent(
   tools,
   toolFunctions,
-  [{ role: 'user', content: "Quelle est la dernière version de Node.js, et combien de jours se sont écoulés depuis le 1er janvier 2024 ?" }]
+  [
+    {
+      role: 'system',
+      content: "Réponds en texte brut, sans markdown. Pour calculer des jours écoulés, utilise une seule expression avec le nombre total de jours (ex: 365 + 366 + ...) en un seul appel calculate."
+    },
+    { role: 'user', content: "Quelle est la dernière version de Node.js, et combien de jours se sont écoulés depuis le 1er janvier 2024 ?" }
+  ]
 );
 
 console.log('\nRéponse :', answer);
