@@ -142,4 +142,19 @@ npm run hybrid
 |---------|-------|
 | `dotenv` | Chargement des variables d'environnement |
 | `mathjs` | Évaluation sécurisée des expressions mathématiques |
+| `validator` | Validation et sanitisation des entrées |
 | `express` | (disponible pour extensions futures) |
+
+---
+
+## Sécurité
+
+| Vecteur | Mesure |
+|---------|--------|
+| Entrées outils | `validator` : `isEmpty`, `isLength`, `stripLow`, `matches` sur chaque paramètre |
+| SSRF (`fetch_page`) | `validator.isURL` + blocage IP privées (RFC 1918, loopback, `169.254.x.x`) |
+| Prototype pollution | Nom d'outil validé par regex + lookup via `hasOwnProperty` |
+| JSON malformé | `JSON.parse` des arguments dans un `try/catch` |
+| Boucle infinie | Max 20 itérations dans `agent-loop.js` |
+| Clés API | Vérifiées au démarrage — arrêt immédiat si absentes |
+
