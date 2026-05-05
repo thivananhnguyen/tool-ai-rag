@@ -2,20 +2,30 @@
 // agent-loop.js
 import 'dotenv/config';
 
-// Appel HTTP à l'API Mistral — factorisé pour éviter la répétition
-async function callMistral(messages, tools) {
-  const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`
-    },
-    body: JSON.stringify({ model: 'mistral-small-latest', messages, tools, tool_choice: 'auto' })
-  });
-  if (!response.ok) {
+// Appel HTTP à l'API Mistral avec retry automatique (429/503 transitoires)
+async function callMistral(messages, tools, retries = 5) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`
+      },
+      body: JSON.stringify({ model: 'mistral-small-latest', messages, tools, tool_choice: 'auto' })
+    });
+
+    if (response.ok) return response.json();
+
+    const isRetryable = response.status === 429 || response.status === 503;
+    if (isRetryable && attempt < retries) {
+      const wait = attempt * 10000; // 10s, 20s, 30s, 40s
+      console.log(`[Agent] Erreur ${response.status} — retry ${attempt}/${retries} dans ${wait / 1000}s...`);
+      await new Promise(r => setTimeout(r, wait));
+      continue;
+    }
+
     throw new Error(`Erreur Mistral API : ${response.status} ${await response.text()}`);
   }
-  return response.json();
 }
 
 /**

@@ -99,12 +99,55 @@ export async function web_search({ query }) {
   }
   const data = await response.json();
 
-  const topics = (data.RelatedTopics || [])
+  const results = (data.RelatedTopics || [])
     .filter(t => t.Text)
     .slice(0, 5)
     .map(t => ({ text: t.Text, url: t.FirstURL }));
 
-  if (topics.length > 0) return topics;
-  if (data.AbstractText) return [{ text: data.AbstractText, url: data.AbstractURL }];
-  return { message: 'Aucun résultat trouvé.' };
+  if (results.length === 0 && data.AbstractText) {
+    return [{ text: data.AbstractText, url: data.AbstractURL }];
+  }
+  return results.length > 0 ? results : { message: 'Aucun résultat trouvé.' };
+}
+
+// ─── Lecture de page web ─────────────────────────────────────────────────────
+
+export const fetchPageTool = {
+  type: 'function',
+  function: {
+    name: 'fetch_page',
+    description: "Récupère et lit le contenu textuel d'une page web à partir de son URL. Utiliser après web_search pour approfondir un résultat et obtenir des détails précis.",
+    parameters: {
+      type: 'object',
+      properties: {
+        url: {
+          type: 'string',
+          description: "L'URL complète de la page à lire (ex: 'https://nodejs.org/en/blog/...')"
+        }
+      },
+      required: ['url']
+    }
+  }
+};
+
+export async function fetch_page({ url }) {
+  const response = await fetch(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0 (educational project)' }
+  });
+  if (!response.ok) {
+    return { error: `Impossible de lire la page : ${response.status}` };
+  }
+  const html = await response.text();
+
+  // Extraction brutale du texte : on retire les balises HTML
+  // Pour un vrai projet : utiliser cheerio ou node-html-parser
+  const text = html
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 3000); // on limite pour ne pas saturer le contexte
+
+  return { url, content: text };
 }

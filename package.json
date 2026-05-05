@@ -7,7 +7,9 @@
     "calculatrice": "node calculatrice-agent.js",
     "weather": "node weather-agent.js",
     "search": "node search-agent.js",
-    "chat": "node chat-agent.js"
+    "chat": "node chat-agent.js",
+    "vector-store": "node vector-store.js",
+    "hybrid": "node hybrid-agent.js"
   },
   "keywords": [],
   "author": "",
