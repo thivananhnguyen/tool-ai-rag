@@ -2,6 +2,11 @@
 // agent-loop.js
 import 'dotenv/config';
 
+// Vérifie la présence des variables d'environnement requises au démarrage
+if (!process.env.MISTRAL_API_KEY) {
+  throw new Error('[Sécurité] Variable d\'environnement MISTRAL_API_KEY manquante.');
+}
+
 // Appel HTTP à l'API Mistral avec retry automatique (429/503 transitoires)
 async function callMistral(messages, tools, retries = 5) {
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -65,10 +70,27 @@ export async function runAgent(tools, toolFunctions, messages, maxHistory = 20) 
 
     if (choice.finish_reason === 'tool_calls') {
       for (const toolCall of choice.message.tool_calls) {
-        const fn = toolFunctions[toolCall.function.name];
-        if (!fn) throw new Error(`Outil inconnu : ${toolCall.function.name}`);
-        const args = JSON.parse(toolCall.function.arguments);
-        console.log(`  → ${toolCall.function.name}(${toolCall.function.arguments})`);
+        const toolName = toolCall.function.name;
+
+        // Allowlist : rejette tout nom d'outil qui ne serait pas un identifiant simple
+        // (protection contre prototype pollution : __proto__, constructor, etc.)
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(toolName)) {
+          throw new Error(`Nom d'outil invalide : "${toolName}"`);
+        }
+
+        const fn = Object.prototype.hasOwnProperty.call(toolFunctions, toolName)
+          ? toolFunctions[toolName]
+          : undefined;
+        if (!fn) throw new Error(`Outil inconnu : ${toolName}`);
+
+        let args;
+        try {
+          args = JSON.parse(toolCall.function.arguments);
+        } catch {
+          throw new Error(`Arguments JSON invalides pour l'outil "${toolName}" : ${toolCall.function.arguments}`);
+        }
+
+        console.log(`  → ${toolName}(${toolCall.function.arguments})`);
         const result = await fn(args);
         messages.push({
           role: 'tool',

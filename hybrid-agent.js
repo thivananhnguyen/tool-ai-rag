@@ -14,6 +14,11 @@ import { getEmbedding } from './vector-store.js';
 const PINECONE_API_KEY = process.env.PINECONE_API_KEY;
 const PINECONE_HOST    = process.env.PINECONE_INDEX_HOST;
 
+// Vérifie la présence des variables d'environnement Pinecone au démarrage
+if (!PINECONE_API_KEY || !PINECONE_HOST) {
+  throw new Error('[Sécurité] Variables d\'environnement PINECONE_API_KEY et/ou PINECONE_INDEX_HOST manquantes.');
+}
+
 // ─── Outil rag_search ────────
 
 const ragTool = {

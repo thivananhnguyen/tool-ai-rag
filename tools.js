@@ -1,6 +1,7 @@
 // tools.js — Définitions et implémentations des outils partagés entre tous les agents
 import 'dotenv/config';
 import { evaluate } from 'mathjs';
+import validator from 'validator';
 
 // ─── Calculatrice ──────
 
@@ -24,8 +25,14 @@ export const calculateTool = {
 
 // mathjs.evaluate est sûr : il n'exécute pas de code arbitraire (contrairement à eval)
 export function calculate({ expression }) {
+  if (!expression || typeof expression !== 'string' || validator.isEmpty(expression.trim())) {
+    return { error: 'Expression invalide : doit être une chaîne non vide.' };
+  }
+  if (!validator.isLength(expression.trim(), { min: 1, max: 500 })) {
+    return { error: 'Expression invalide : trop longue (max 500 caractères).' };
+  }
   try {
-    const result = evaluate(expression);
+    const result = evaluate(validator.trim(expression));
     return { result };
   } catch (err) {
     return { error: `Expression invalide : ${err.message}` };
@@ -53,14 +60,25 @@ export const weatherTool = {
 };
 
 export async function get_weather({ city }) {
-  const response = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`);
+  if (!city || typeof city !== 'string' || validator.isEmpty(city.trim())) {
+    return { error: 'Ville invalide : doit être une chaîne non vide.' };
+  }
+  const sanitizedCity = validator.trim(city);
+  if (!validator.isLength(sanitizedCity, { min: 1, max: 100 })) {
+    return { error: 'Nom de ville invalide : trop long (max 100 caractères).' };
+  }
+  if (!validator.matches(sanitizedCity, /^[\p{L}\s\-'.]+$/u)) {
+    return { error: 'Nom de ville invalide : caractères non autorisés.' };
+  }
+
+  const response = await fetch(`https://wttr.in/${encodeURIComponent(sanitizedCity)}?format=j1`);
   if (!response.ok) {
-    return { error: `Impossible de récupérer la météo pour ${city}` };
+    return { error: `Impossible de récupérer la météo pour ${sanitizedCity}` };
   }
   const data = await response.json();
   const current = data.current_condition[0];
   return {
-    city,
+    city: sanitizedCity,
     temperature_c: current.temp_C,
     feels_like_c: current.FeelsLikeC,
     description: current.weatherDesc[0].value,
@@ -93,11 +111,10 @@ export const searchTool = {
 const searchCache = new Map();
 
 export async function web_search({ query }) {
-  // Validation : query doit être une string non vide
-  if (!query || typeof query !== 'string' || query.trim().length === 0) {
+  if (!query || typeof query !== 'string' || validator.isEmpty(query.trim())) {
     return { error: 'Requête invalide : query doit être une chaîne non vide.' };
   }
-  const q = query.trim().slice(0, 200); // limite la taille pour éviter les abus
+  const q = validator.trim(validator.stripLow(query)).slice(0, 200); // stripLow retire les caractères de contrôle
 
   if (searchCache.has(q)) {
     console.log(`  [cache] web_search("${q}")`);
@@ -146,8 +163,55 @@ export const fetchPageTool = {
   }
 };
 
+// ─── Validation SSRF ─────────────────────────────────────────────────────────
+// validator.isURL vérifie le format et le protocole.
+// La vérification des plages IP privées reste nécessaire car validator ne la fait pas nativement.
+const PRIVATE_IP_RANGES = [
+  /^10\./,                          // 10.0.0.0/8
+  /^172\.(1[6-9]|2\d|3[01])\./,    // 172.16.0.0/12
+  /^192\.168\./,                    // 192.168.0.0/16
+  /^127\./,                         // 127.0.0.0/8 loopback
+  /^169\.254\./,                    // 169.254.0.0/16 link-local / metadata cloud
+  /^0\./,                           // 0.0.0.0/8
+  /^::1$/,                          // IPv6 loopback
+  /^fe80/i,                         // IPv6 link-local
+];
+
+function assertSafeUrl(rawUrl) {
+  // validator.isURL : protocole restreint à http/https, pas d'auth user:pass, TLD requis
+  const isValidUrl = validator.isURL(rawUrl, {
+    protocols: ['http', 'https'],
+    require_protocol: true,
+    require_tld: true,
+    disallow_auth: true,       // interdit user:pass@host
+    allow_query_components: true
+  });
+  if (!isValidUrl) {
+    throw new Error('URL invalide ou protocole non autorisé.');
+  }
+
+  // Vérification anti-SSRF sur les plages IP privées
+  const host = new URL(rawUrl).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (host === 'localhost' || host === '0.0.0.0') {
+    throw new Error('Accès aux ressources locales interdit.');
+  }
+  if (PRIVATE_IP_RANGES.some(re => re.test(host))) {
+    throw new Error('Accès aux adresses IP privées/internes interdit (SSRF).');
+  }
+}
+
 export async function fetch_page({ url }) {
-  const response = await fetch(url, {
+  if (!url || typeof url !== 'string' || validator.isEmpty(url.trim())) {
+    return { error: 'URL invalide : doit être une chaîne non vide.' };
+  }
+  const cleanUrl = validator.trim(url);
+  try {
+    assertSafeUrl(cleanUrl);
+  } catch (err) {
+    return { error: `URL refusée : ${err.message}` };
+  }
+
+  const response = await fetch(cleanUrl, {
     headers: { 'User-Agent': 'Mozilla/5.0 (educational project)' }
   });
   if (!response.ok) {
@@ -165,5 +229,5 @@ export async function fetch_page({ url }) {
     .trim()
     .slice(0, 3000); // on limite pour ne pas saturer le contexte
 
-  return { url, content: text };
+  return { url: cleanUrl, content: text };
 }
