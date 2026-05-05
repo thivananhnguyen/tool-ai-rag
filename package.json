@@ -6,7 +6,8 @@
   "scripts": {
     "calculatrice": "node calculatrice-agent.js",
     "weather": "node weather-agent.js",
-    "agent-loop": "node agent-loop.js"
+    "search": "node search-agent.js",
+    "chat": "node chat-agent.js"
   },
   "keywords": [],
   "author": "",

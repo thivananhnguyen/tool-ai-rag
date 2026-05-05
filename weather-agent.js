@@ -1,60 +1,24 @@
 
-// weather-agent.js
+// weather-agent.js — Phase 2 : Météo + Calculatrice
+// Le modèle choisit seul entre les deux outils (ex: météo puis conversion Fahrenheit).
 import 'dotenv/config';
 import { runAgent } from './agent-loop.js';
+import { calculateTool, calculate, weatherTool, get_weather } from './tools.js';
 
-// --- Outil météo ---
-const weatherTool = {
-  type: 'function',
-  function: {
-    name: 'get_weather',
-    description: 'Récupère la météo actuelle pour une ville donnée. Utiliser quand on parle de météo, température, conditions climatiques.',
-    parameters: {
-      type: 'object',
-      properties: {
-        city: {
-          type: 'string',
-          description: "Le nom de la ville, en anglais de préférence (ex: 'Paris', 'London', 'Tokyo')"
-        }
-      },
-      required: ['city']
-    }
-  }
-};
+const tools = [weatherTool, calculateTool];
+const toolFunctions = { get_weather, calculate };
 
-// --- Implémentation de l'outil ---
-async function get_weather({ city }) {
-  // wttr.in : API météo publique, format JSON, aucune clé requise
-  const response = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`);
+// Devrait : appeler get_weather(London) puis calculate((temp*9/5)+32)
+const answer = await runAgent(
+  tools,
+  toolFunctions,
+  [
+    {
+      role: 'system',
+      content: "Réponds en texte brut, sans markdown ni bullet points. Exemple : \"À Londres, il fait 16°C (60.8°F), ciel nuageux, humidité 51%.\""
+    },
+    { role: 'user', content: "Quelle est la météo à Londres, et si je convertis la température en Fahrenheit ?" }
+  ]
+);
 
-  if (!response.ok) {
-    return { error: `Impossible de récupérer la météo pour ${city}` };
-  }
-
-  const data = await response.json();
-  const current = data.current_condition[0];
-
-  return {
-    city,
-    temperature_c: current.temp_C,
-    feels_like_c: current.FeelsLikeC,
-    description: current.weatherDesc[0].value,
-    humidity: current.humidity + '%',
-    wind_kmph: current.windspeedKmph
-  };
-}
-
-// --- Agent qui combine calculatrice + météo ---
-const tools = [weatherTool /*, calculatorTool */];
-const toolFunctions = {
-  get_weather
-  // calculate: ...
-};
-
-// Test 1 : météo dans deux villes simultanément
-const reponse1 = await runAgent(tools, toolFunctions, 'Quelle est la météo à Paris et à Tokyo en ce moment ?');
-console.log('\nRéponse 1 :', reponse1);
-
-// Test 2 : conseil vestimentaire basé sur la météo
-const reponse2 = await runAgent(tools, toolFunctions, 'Il fait combien à Lyon ? Est-ce qu\'il faut un manteau ?');
-console.log('\nRéponse 2 :', reponse2);
+console.log('\nRéponse :', answer);
