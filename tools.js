@@ -89,8 +89,22 @@ export const searchTool = {
   }
 };
 
+// Cache en mémoire pour web_search — évite de rappeler DuckDuckGo pour la même query
+const searchCache = new Map();
+
 export async function web_search({ query }) {
-  const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`;
+  // Validation : query doit être une string non vide
+  if (!query || typeof query !== 'string' || query.trim().length === 0) {
+    return { error: 'Requête invalide : query doit être une chaîne non vide.' };
+  }
+  const q = query.trim().slice(0, 200); // limite la taille pour éviter les abus
+
+  if (searchCache.has(q)) {
+    console.log(`  [cache] web_search("${q}")`);
+    return searchCache.get(q);
+  }
+
+  const url = `https://api.duckduckgo.com/?q=${encodeURIComponent(q)}&format=json&no_html=1&skip_disambig=1`;
   const response = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (educational project)' }
   });
@@ -107,7 +121,9 @@ export async function web_search({ query }) {
   if (results.length === 0 && data.AbstractText) {
     return [{ text: data.AbstractText, url: data.AbstractURL }];
   }
-  return results.length > 0 ? results : { message: 'Aucun résultat trouvé.' };
+  const output = results.length > 0 ? results : { message: 'Aucun résultat trouvé.' };
+  searchCache.set(q, output); // mise en cache
+  return output;
 }
 
 // ─── Lecture de page web ─────────────────────────────────────────────────────

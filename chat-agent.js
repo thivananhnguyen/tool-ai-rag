@@ -20,7 +20,14 @@ const conversationHistory = [
  * l'historique en place (messages outil + réponse finale inclus), retourne la réponse.
  */
 export async function chatWithAgent(userMessage) {
-  conversationHistory.push({ role: 'user', content: userMessage });
+  // Validation input : rejette les messages vides ou trop longs
+  if (!userMessage || typeof userMessage !== 'string' || userMessage.trim().length === 0) {
+    return "Message invalide : veuillez entrer une question.";
+  }
+  if (userMessage.length > 2000) {
+    return "Message trop long : maximum 2000 caractères.";
+  }
+  conversationHistory.push({ role: 'user', content: userMessage.trim() });
   return runAgent(tools, toolFunctions, conversationHistory);
 }
 

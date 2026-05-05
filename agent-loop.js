@@ -33,13 +33,23 @@ async function callMistral(messages, tools, retries = 5) {
  * @param {Array}  tools         — définitions JSON Schema des outils
  * @param {Object} toolFunctions — { nomOutil: fn } pour l'exécution locale
  * @param {Array}  messages      — tableau muté en place (permet la mémoire de conversation)
+ * @param {number} maxHistory    — garde les N derniers messages (hors system) pour limiter les tokens
  * @returns {string}             — réponse textuelle finale
  */
-export async function runAgent(tools, toolFunctions, messages) {
+export async function runAgent(tools, toolFunctions, messages, maxHistory = 20) {
+  // Limite la taille de l'historique : garde le system prompt + les maxHistory derniers messages
+  const truncate = () => {
+    const system = messages.filter(m => m.role === 'system');
+    const rest   = messages.filter(m => m.role !== 'system');
+    if (rest.length > maxHistory) {
+      messages.splice(0, messages.length, ...system, ...rest.slice(-maxHistory));
+    }
+  };
   let iterations = 0;
 
   while (iterations < 20) {
     iterations++;
+    truncate(); // applique la limite avant chaque appel
     const callStart = Date.now();
     const data = await callMistral(messages, tools);
     const choice = data.choices[0];

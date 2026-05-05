@@ -68,13 +68,20 @@ Pour web_search : une seule recherche, complète avec tes connaissances si néce
 ];
 
 async function chatWithHybridAgent(userMessage) {
-  conversationHistory.push({ role: 'user', content: userMessage });
+  // Validation input : rejette les messages vides ou trop longs
+  if (!userMessage || typeof userMessage !== 'string' || userMessage.trim().length === 0) {
+    return "Message invalide : veuillez entrer une question.";
+  }
+  if (userMessage.length > 2000) {
+    return "Message trop long : maximum 2000 caractères.";
+  }
+  conversationHistory.push({ role: 'user', content: userMessage.trim() });
   return runAgent(tools, toolFunctions, conversationHistory);
 }
 
 // ─── Tests Phase 9 ──────────
 const tests = [
-  { q: "Qui a créé Node.js ?",                               expected: "rag_search"  },
+  { q: "Qui a créé Node.js ?",                              expected: "rag_search"  },
   { q: "Qui a gagné la Coupe du Monde 2022 ?",              expected: "web_search"  },
   { q: "Quel temps fait-il à Lyon ?",                       expected: "get_weather" },
   { q: "Combien fait la surface d'une sphère de rayon 5 ?", expected: "calculate"   }
