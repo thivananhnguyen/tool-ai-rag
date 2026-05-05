@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "calculatrice": "node calculatrice-agent.js"
+    "calculatrice": "node calculatrice-agent.js",
+    "weather": "node weather-agent.js",
+    "agent-loop": "node agent-loop.js"
   },
   "keywords": [],
   "author": "",
